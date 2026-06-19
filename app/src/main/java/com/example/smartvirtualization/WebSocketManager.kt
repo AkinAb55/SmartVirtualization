@@ -1,17 +1,19 @@
 package com.example.smartvirtualization.utils
 
 import android.util.Log
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import java.net.HttpURLConnection
-import java.net.URL
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.io.OutputStreamWriter
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.Response
+import okhttp3.WebSocket
+import okhttp3.WebSocketListener
+import java.util.concurrent.TimeUnit
 
 class WebSocketManager private constructor() {
-    private var connection: HttpURLConnection? = null
-    private var isConnecting = false
+    private var webSocket: WebSocket? = null
+    private var isConnected = false
+    private val client = OkHttpClient.Builder()
+        .readTimeout(0, TimeUnit.MILLISECONDS)
+        .build()
 
     companion object {
         private const val TAG = "WebSocketManager"
@@ -19,7 +21,10 @@ class WebSocketManager private constructor() {
 
         @Synchronized
         fun getInstance(): WebSocketManager {
-            return instance ?: WebSocketManager().also { instance = it }
+            if (instance == null) {
+                instance = WebSocketManager()
+            }
+            return instance!!
         }
     }
 
@@ -29,66 +34,81 @@ class WebSocketManager private constructor() {
         onMessageReceived: (String) -> Unit,
         onFailure: (String) -> Unit
     ) {
-        if (isConnecting) {
-            Log.d(TAG, "Connection attempt already in progress")
-            return
-        }
-
         try {
-            isConnecting = true
-            withContext(Dispatchers.IO) {
-                val url = URL(serverUrl)
-                connection = (url.openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    doInput = true
-                    doOutput = true
+            if (isConnected) {
+                onFailure("Already connected")
+                return
+            }
+
+            val request = Request.Builder()
+                .url(serverUrl)
+                .build()
+
+            val listener = object : WebSocketListener() {
+                override fun onOpen(webSocket: WebSocket, response: Response) {
+                    super.onOpen(webSocket, response)
+                    isConnected = true
+                    Log.d(TAG, "WebSocket connected")
+                    onConnected()
                 }
 
-                connection?.let { conn ->
-                    if (conn.responseCode == HttpURLConnection.HTTP_OK) {
-                        onConnected()
-                        val reader = BufferedReader(InputStreamReader(conn.inputStream))
-                        var line: String?
-                        while (reader.readLine().also { line = it } != null) {
-                            line?.let { onMessageReceived(it) }
-                        }
-                    } else {
-                        onFailure("Connection failed: ${conn.responseMessage}")
-                    }
+                override fun onMessage(webSocket: WebSocket, text: String) {
+                    super.onMessage(webSocket, text)
+                    Log.d(TAG, "Message received: ${text.take(50)}...")
+                    onMessageReceived(text)
+                }
+
+                override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
+                    super.onClosing(webSocket, code, reason)
+                    webSocket.close(1000, null)
+                    Log.d(TAG, "WebSocket closing: $reason")
+                }
+
+                override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                    super.onFailure(webSocket, t, response)
+                    isConnected = false
+                    Log.e(TAG, "WebSocket error: ${t.message}")
+                    onFailure("Connection error: ${t.message}")
+                }
+
+                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                    super.onClosed(webSocket, code, reason)
+                    isConnected = false
+                    Log.d(TAG, "WebSocket closed")
                 }
             }
+
+            webSocket = client.newWebSocket(request, listener)
+
         } catch (e: Exception) {
-            Log.e(TAG, "Connection error", e)
-            onFailure("Connection error: ${e.message}")
-        } finally {
-            isConnecting = false
+            Log.e(TAG, "Error starting connection: ${e.message}")
+            onFailure("Failed to start connection: ${e.message}")
         }
     }
 
-    suspend fun sendMessage(message: String): Boolean {
-        return try {
-            withContext(Dispatchers.IO) {
-                connection?.let { conn ->
-                    OutputStreamWriter(conn.outputStream).use { writer ->
-                        writer.write(message)
-                        writer.flush()
-                    }
-                    true
-                } ?: false
+    suspend fun sendMessage(message: String) {
+        try {
+            if (webSocket != null && isConnected) {
+                webSocket?.send(message)
+                Log.d(TAG, "Message sent: ${message.take(50)}...")
+            } else {
+                Log.w(TAG, "WebSocket not connected")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error sending message", e)
-            false
+            Log.e(TAG, "Error sending message: ${e.message}")
         }
     }
 
     fun closeConnection() {
         try {
-            connection?.disconnect()
-            connection = null
-            isConnecting = false
+            webSocket?.close(1000, "Client closing")
+            webSocket = null
+            isConnected = false
+            Log.d(TAG, "Connection closed")
         } catch (e: Exception) {
-            Log.e(TAG, "Error closing connection", e)
+            Log.e(TAG, "Error closing connection: ${e.message}")
         }
     }
+
+    fun isConnected(): Boolean = isConnected
 }
