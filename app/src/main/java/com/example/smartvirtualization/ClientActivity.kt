@@ -14,8 +14,8 @@ import com.example.smartvirtualization.databinding.ActivityClientBinding
 import com.example.smartvirtualization.utils.WebSocketManager
 
 class ClientActivity : AppCompatActivity() {
-    private var _binding: ActivityClientBinding? = null
-    private val binding get() = _binding!!
+
+    private lateinit var binding: ActivityClientBinding
     private val webSocketManager = WebSocketManager.getInstance()
     private var isConnected = false
 
@@ -25,20 +25,18 @@ class ClientActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        _binding = ActivityClientBinding.inflate(layoutInflater)
+        binding = ActivityClientBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         setupUI()
     }
 
     private fun setupUI() {
-        binding.apply {
-            connectButton.setOnClickListener {
-                if (!isConnected) {
-                    connectToHost()
-                } else {
-                    disconnectFromHost()
-                }
+        binding.connectButton.setOnClickListener {
+            if (!isConnected) {
+                connectToHost()
+            } else {
+                disconnectFromHost()
             }
         }
     }
@@ -58,9 +56,7 @@ class ClientActivity : AppCompatActivity() {
             webSocketManager.startConnection(
                 serverUrl = serverUrl,
                 onConnected = {
-                    runOnUiThread {
-                        connectionEstablished()
-                    }
+                    runOnUiThread { connectionEstablished() }
                 },
                 onMessageReceived = { message ->
                     handleIncomingMessage(message)
@@ -73,10 +69,8 @@ class ClientActivity : AppCompatActivity() {
                 }
             )
 
-            binding.apply {
-                statusText.text = getString(R.string.status_connecting)
-                connectButton.isEnabled = false
-            }
+            binding.statusText.text = getString(R.string.status_connecting)
+            binding.connectButton.isEnabled = false
 
         } catch (e: Exception) {
             showError(getString(R.string.error_connection, e.message))
@@ -88,33 +82,27 @@ class ClientActivity : AppCompatActivity() {
             val imageBytes = Base64.decode(message, Base64.DEFAULT)
             val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
 
-            runOnUiThread {
-                updateScreenView(bitmap)
-            }
+            runOnUiThread { updateScreenView(bitmap) }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing message: ${e.message}")
         }
     }
 
     private fun updateScreenView(bitmap: Bitmap) {
-        binding.apply {
-            screenView.setImageBitmap(bitmap)
-            if (screenView.visibility != View.VISIBLE) {
-                screenView.visibility = View.VISIBLE
-            }
+        binding.screenView.setImageBitmap(bitmap)
+        if (binding.screenView.visibility != View.VISIBLE) {
+            binding.screenView.visibility = View.VISIBLE
         }
     }
 
     private fun connectionEstablished() {
         isConnected = true
-        binding.apply {
-            connectButton.isEnabled = true
-            connectButton.text = getString(R.string.disconnect)
-            statusText.text = getString(R.string.status_connected)
-            statusText.setTextColor(Color.GREEN)
-            ipAddressInput.isEnabled = false
-            sessionIdInput.isEnabled = false
-        }
+        binding.connectButton.isEnabled = true
+        binding.connectButton.text = getString(R.string.disconnect)
+        binding.statusText.text = getString(R.string.status_connected)
+        binding.statusText.setTextColor(Color.GREEN)
+        binding.ipAddressInput.isEnabled = false
+        binding.sessionIdInput.isEnabled = false
     }
 
     private fun disconnectFromHost() {
@@ -124,27 +112,22 @@ class ClientActivity : AppCompatActivity() {
 
     private fun resetConnection() {
         isConnected = false
-        binding.apply {
-            connectButton.isEnabled = true
-            connectButton.text = getString(R.string.connect)
-            statusText.text = ""
-            screenView.visibility = View.GONE
-            ipAddressInput.isEnabled = true
-            sessionIdInput.isEnabled = true
-        }
+        binding.connectButton.isEnabled = true
+        binding.connectButton.text = getString(R.string.connect)
+        binding.statusText.text = ""
+        binding.screenView.visibility = View.GONE
+        binding.ipAddressInput.isEnabled = true
+        binding.sessionIdInput.isEnabled = true
     }
 
     private fun showError(message: String) {
-        binding.apply {
-            statusText.text = message
-            statusText.setTextColor(Color.RED)
-        }
+        binding.statusText.text = message
+        binding.statusText.setTextColor(Color.RED)
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     override fun onDestroy() {
         super.onDestroy()
         webSocketManager.closeConnection()
-        _binding = null
     }
 }
