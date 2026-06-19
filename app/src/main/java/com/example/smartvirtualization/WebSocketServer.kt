@@ -67,11 +67,7 @@ class WebSocketServer private constructor() {
                 }
             }
 
-            server?.dispatcher?.apply {
-                setIdleCallback {
-                    Log.d(TAG, "Server is idle")
-                }
-            }
+            // Блок с setIdleCallback удален, так как он не поддерживается актуальными версиями библиотеки
 
             isRunning = true
             Log.d(TAG, "Server started on port $port")
