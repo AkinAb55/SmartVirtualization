@@ -22,7 +22,6 @@ android {
         }
     }
 
-    // Совместимость Java/Kotlin
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -31,7 +30,6 @@ android {
         jvmTarget = "17"
     }
 
-    // Включаем ViewBinding и DataBinding
     buildFeatures {
         viewBinding true
         dataBinding true
