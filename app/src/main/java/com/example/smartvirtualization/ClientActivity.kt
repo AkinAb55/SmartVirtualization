@@ -27,17 +27,12 @@ class ClientActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityClientBinding.inflate(layoutInflater)
         setContentView(binding.root)
-
         setupUI()
     }
 
     private fun setupUI() {
         binding.connectButton.setOnClickListener {
-            if (!isConnected) {
-                connectToHost()
-            } else {
-                disconnectFromHost()
-            }
+            if (!isConnected) connectToHost() else disconnectFromHost()
         }
     }
 
@@ -55,12 +50,8 @@ class ClientActivity : AppCompatActivity() {
         try {
             webSocketManager.startConnection(
                 serverUrl = serverUrl,
-                onConnected = {
-                    runOnUiThread { connectionEstablished() }
-                },
-                onMessageReceived = { message ->
-                    handleIncomingMessage(message)
-                },
+                onConnected = { runOnUiThread { connectionEstablished() } },
+                onMessageReceived = { message -> handleIncomingMessage(message) },
                 onFailure = { error ->
                     runOnUiThread {
                         showError(getString(R.string.error_connection_failed, error))
@@ -81,7 +72,6 @@ class ClientActivity : AppCompatActivity() {
         try {
             val imageBytes = Base64.decode(message, Base64.DEFAULT)
             val bitmap = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.size)
-
             runOnUiThread { updateScreenView(bitmap) }
         } catch (e: Exception) {
             Log.e(TAG, "Error processing message: ${e.message}")
