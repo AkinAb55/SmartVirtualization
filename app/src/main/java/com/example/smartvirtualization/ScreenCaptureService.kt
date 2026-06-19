@@ -21,6 +21,10 @@ import android.util.Log
 import android.view.WindowManager
 import com.example.smartvirtualization.R
 import com.example.smartvirtualization.utils.WebSocketManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
 
 class ScreenCaptureService : Service() {
@@ -29,6 +33,7 @@ class ScreenCaptureService : Service() {
     private var imageReader: ImageReader? = null
     private var isStreaming = false
     private val webSocketManager = WebSocketManager.getInstance()
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     companion object {
         private const val TAG = "ScreenCaptureService"
@@ -103,7 +108,10 @@ class ScreenCaptureService : Service() {
                                 Base64.DEFAULT
                             )
 
-                            webSocketManager.sendMessage(base64String)
+                            // Запуск отправки в корутине
+                            serviceScope.launch {
+                                webSocketManager.sendMessage(base64String)
+                            }
                             bitmap.recycle()
                         } catch (e: Exception) {
                             Log.e(TAG, "Error streaming screen: ${e.message}")
@@ -165,6 +173,7 @@ class ScreenCaptureService : Service() {
         imageReader?.close()
         mediaProjection?.stop()
         webSocketManager.closeConnection()
+        serviceScope.cancel()
         super.onDestroy()
     }
 }
