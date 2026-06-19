@@ -9,9 +9,11 @@ import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.example.smartvirtualization.R
 import com.example.smartvirtualization.databinding.ActivityClientBinding
 import com.example.smartvirtualization.utils.WebSocketManager
+import kotlinx.coroutines.launch
 
 class ClientActivity : AppCompatActivity() {
 
@@ -48,17 +50,20 @@ class ClientActivity : AppCompatActivity() {
         val serverUrl = "ws://$ipAddress:8080"
 
         try {
-            webSocketManager.startConnection(
-                serverUrl = serverUrl,
-                onConnected = { runOnUiThread { connectionEstablished() } },
-                onMessageReceived = { message -> handleIncomingMessage(message) },
-                onFailure = { error ->
-                    runOnUiThread {
-                        showError(getString(R.string.error_connection_failed, error))
-                        resetConnection()
+            // Запуск в корутине для работы с suspend-функциями
+            lifecycleScope.launch {
+                webSocketManager.startConnection(
+                    serverUrl = serverUrl,
+                    onConnected = { runOnUiThread { connectionEstablished() } },
+                    onMessageReceived = { message -> handleIncomingMessage(message) },
+                    onFailure = { error ->
+                        runOnUiThread {
+                            showError(getString(R.string.error_connection_failed, error))
+                            resetConnection()
+                        }
                     }
-                }
-            )
+                )
+            }
 
             binding.statusText.text = getString(R.string.status_connecting)
             binding.connectButton.isEnabled = false
